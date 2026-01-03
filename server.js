@@ -43,7 +43,7 @@ app.get('/api/debug/db', async (req, res) => {
       ORDER BY table_name
     `);
     
-    console.log('📊 Найдено таблиц:', tables.rows.length);
+    console.log('Найдено таблиц:', tables.rows.length);
     
     const result = {
       connection: 'Подключено к PostgreSQL',
@@ -53,7 +53,7 @@ app.get('/api/debug/db', async (req, res) => {
     
     for (const table of tables.rows) {
       const tableName = table.table_name;
-      console.log(`\n📋 Таблица: ${tableName}`);
+      console.log(`\nТаблица: ${tableName}`);
       
     const columns = await pool.query(`
       SELECT column_name, data_type, is_nullable
