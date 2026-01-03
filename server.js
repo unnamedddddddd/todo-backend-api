@@ -34,6 +34,75 @@ pool.query(`
 });
 
 
+app.get('/api/debug/db', async (req, res) => {
+  try {
+    const tables = await pool.query(`
+      SELECT table_name, table_type 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `);
+    
+    console.log('📊 Найдено таблиц:', tables.rows.length);
+    
+    const result = {
+      connection: 'Подключено к PostgreSQL',
+      databaseInfo: {},
+      tables: []
+    };
+    
+    for (const table of tables.rows) {
+      const tableName = table.table_name;
+      console.log(`\n📋 Таблица: ${tableName}`);
+      
+    const columns = await pool.query(`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'public' 
+      AND table_name = $1
+      ORDER BY ordinal_position`, 
+    [tableName]);
+      
+      const data = await pool.query(`SELECT * FROM "${tableName}"`);
+      
+      const tableInfo = {
+        name: tableName,
+        type: table.table_type,
+        columns: columns.rows,
+        rowCount: data.rows.length,
+        sampleData: data.rows
+      };
+      
+      result.tables.push(tableInfo);
+      console.log(`   Колонки: ${columns.rows.map(c => c.column_name).join(', ')}`);
+      console.log(`   Записей: ${data.rows.length}`);
+    }
+    
+    const totalUsers = await pool.query('SELECT COUNT(*) FROM Users');
+    const totalTasks = await pool.query('SELECT COUNT(*) FROM Tasks');
+    
+    result.stats = {
+      totalUsers: totalUsers.rows[0].count,
+      totalTasks: totalTasks.rows[0].count
+    };
+    
+    console.log('\nСтатистика:');
+    console.log(` Пользователей: ${result.stats.totalUsers}`);
+    console.log(` Задач: ${result.stats.totalTasks}`);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('Ошибка при проверке БД:', error);
+    res.status(500).json({ 
+      error: 'Ошибка базы данных',
+      details: error.message,
+    });
+  }
+});
+
+
+
 app.get('/api/health', async (req, res) => {
   const result = await pool.query('SELECT COUNT(*) as total FROM Users');
   
