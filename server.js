@@ -211,23 +211,6 @@ app.post('/api/todo', async (req, res) => {
   }
 });
 
-app.get('/api/users', async (req, res) => {
-  const result = await pool.query('SELECT user_id, user_login FROM Users');
-  
-  res.json({
-    message: 'Список пользователей',
-    count: result.rows.length,
-    users: result.rows
-  });
-});
-
-app.get('/api/admin/download-db', async (req, res) => {
-  res.status(501).json({ 
-    success: false, 
-    message: 'Функция скачивания БД недоступна для PostgreSQL' 
-  });
-});
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
