@@ -203,6 +203,25 @@ app.get('/api/users', async (req, res) => {
   });
 });
 
+app.get('/api/admin/download-db', async (req, res) => {
+  try {
+    const dbPath = path.join(__dirname, 'auth.db');
+    
+    res.download(dbPath, 'auth-backup.db', (err) => {
+      if (err) {
+        console.error('Ошибка скачивания:', err);
+      }
+    });
+    
+  } catch (error) {
+    console.error('Ошибка:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Ошибка сервера' 
+    });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
