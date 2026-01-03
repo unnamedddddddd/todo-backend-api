@@ -1,42 +1,60 @@
 import express from 'express';
 import cors from 'cors';
-import sqlite3 from 'sqlite3'
-import { open } from 'sqlite'
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import pkg from 'pg';
+const { Pool } = pkg;
 
 const app = express();
 app.use(cors()); 
 app.use(express.json());
 
-const dbPath = path.join(__dirname, 'auth.db');
-const db = await open({
-  filename: dbPath,
-  driver: sqlite3.Database
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
+pool.query(`
+  CREATE TABLE IF NOT EXISTS Users (
+    user_id SERIAL PRIMARY KEY,
+    user_login VARCHAR(50) UNIQUE NOT NULL,
+    user_password VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  
+  CREATE TABLE IF NOT EXISTS Tasks (
+    task_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES Users(user_id) ON DELETE CASCADE,
+    task_name TEXT NOT NULL,
+    done BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`).then(() => {
+  console.log('Таблицы PostgreSQL готовы');
+}).catch(err => {
+  console.error('Ошибка таблиц:', err.message);
+});
+
+
 app.get('/api/health', async (req, res) => {
-  const countResult = await db.get('SELECT COUNT(*) as total FROM Users');
+  const result = await pool.query('SELECT COUNT(*) as total FROM Users');
   
   res.json({
     status: 'Сервер работает',
     time: new Date().toLocaleTimeString(),
-    usersCount: countResult.total
+    usersCount: result.rows[0].total
   });
 });
 
 app.post('/api/login', async (req, res) => {
   const { login, password } = req.body;
   
-  const user = await db.get(
-    'SELECT * FROM Users WHERE user_login = ? AND user_password = ?',
+  const result = await pool.query(
+    'SELECT * FROM Users WHERE user_login = $1 AND user_password = $2',
     [login, password]
   );
-  console.table(user)
-  if (user) {
+  
+  if (result.rows.length > 0) {
+    const user = result.rows[0];
+    console.table(user);
     return res.json({
       success: true,
       message: 'Вход выполнен',
@@ -54,43 +72,43 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/forgotPassword', async (req, res) => {
-  const {login, newPassword} = req.body;
+  const { login, newPassword } = req.body;
 
-  const user = await db.get(
-    `SELECT user_login FROM Users WHERE user_login = ?`,
+  const userResult = await pool.query(
+    'SELECT user_login FROM Users WHERE user_login = $1',
     [login]
-  )
+  );
   
-  if (user) {
-    const result = await db.run(
-      'UPDATE Users SET user_password = ? WHERE user_login = ?',
+  if (userResult.rows.length > 0) {
+    const result = await pool.query(
+      'UPDATE Users SET user_password = $1 WHERE user_login = $2 RETURNING user_id',
       [newPassword, login]
-    )
+    );
 
     res.status(201).json({
-    success: true,
-    message: 'Пароль успешно обновлен',
-    userLogin: login,
-    userId: result.lastID  
-  });
+      success: true,
+      message: 'Пароль успешно обновлен',
+      userLogin: login,
+      userId: result.rows[0].user_id
+    });
   } else {
-      return res.status(409).json({
-        success: false,
-        error: 'Пользователь не найден',
-        message: 'Пользователь с таким логином не найден'
-      });
+    return res.status(409).json({
+      success: false,
+      error: 'Пользователь не найден',
+      message: 'Пользователь с таким логином не найден'
+    });
   }
-})
+});
 
 app.post('/api/createUser', async (req, res) => { 
   const { login, password } = req.body;
   
-  const existingUser = await db.get(
-    `SELECT user_login FROM Users WHERE user_login = ?`,
+  const existingUser = await pool.query(
+    'SELECT user_login FROM Users WHERE user_login = $1',
     [login]
   );
 
-  if (existingUser) {
+  if (existingUser.rows.length > 0) {
     return res.status(409).json({
       success: false,
       error: 'Логин уже занят',
@@ -98,8 +116,8 @@ app.post('/api/createUser', async (req, res) => {
     });
   }
 
-  const result = await db.run(  
-    'INSERT INTO Users(user_login, user_password) VALUES (?, ?)',
+  const result = await pool.query(
+    'INSERT INTO Users(user_login, user_password) VALUES ($1, $2) RETURNING user_id',
     [login, password]
   );
   
@@ -107,21 +125,21 @@ app.post('/api/createUser', async (req, res) => {
     success: true,
     message: 'Пользователь создан успешно',
     userLogin: login,
-    userId: result.lastID  
+    userId: result.rows[0].user_id
   });
 });
 
 app.get('/api/todo/:userId', async (req, res) => {
   try {
     const { userId } = req.params; 
-    const tasks = await db.all(
-      'SELECT * FROM Tasks WHERE user_id = ? ORDER BY created_at DESC',
+    const result = await pool.query(
+      'SELECT * FROM Tasks WHERE user_id = $1 ORDER BY created_at DESC',
       [userId]
     );
         
     return res.json({
       success: true,
-      tasks 
+      tasks: result.rows
     });
     
   } catch (error) {
@@ -134,12 +152,13 @@ app.get('/api/todo/:userId', async (req, res) => {
 });
 
 app.delete('/api/todo/delete/:taskId', async (req, res) => {
-  const {taskId} = req.params;
-  const result = await db.run(
-    'DELETE FROM Tasks WHERE task_id = ?',
+  const { taskId } = req.params;
+  const result = await pool.query(
+    'DELETE FROM Tasks WHERE task_id = $1',
     [taskId]
-  )
-  if (result.changes > 0) {
+  );
+  
+  if (result.rowCount > 0) {
     return res.json({
       success: true,
     });
@@ -151,12 +170,13 @@ app.delete('/api/todo/delete/:taskId', async (req, res) => {
 });
 
 app.post('/api/todo/edit', async (req, res) => {
-  const {taskId, newTaskName} = req.body;
-  const result = await db.run(
-    'UPDATE Tasks SET task_name = ? WHERE task_id = ?',
+  const { taskId, newTaskName } = req.body;
+  const result = await pool.query(
+    'UPDATE Tasks SET task_name = $1 WHERE task_id = $2',
     [newTaskName, taskId]
-  )
-  if (result.changes > 0) {
+  );
+  
+  if (result.rowCount > 0) {
     return res.json({
       success: true,
     });
@@ -170,56 +190,42 @@ app.post('/api/todo/edit', async (req, res) => {
 app.post('/api/todo', async (req, res) => {
   const newTask = req.body;
 
-  const result = await db.run(
-    'INSERT INTO Tasks(user_id, task_name, done) VALUES (?,?,0)',
-    [newTask.user_id, newTask.text]
-  ) 
-  if (result) {
-    const addedTask = await db.get(
-      'SELECT * FROM Tasks WHERE task_id = ?',
-      [result.lastID]
+  try {
+    const result = await pool.query(
+      'INSERT INTO Tasks(user_id, task_name, done) VALUES ($1, $2, false) RETURNING *',
+      [newTask.user_id, newTask.text]
     );
-    console.table(addedTask)
+    
+    const addedTask = result.rows[0];
+    console.table(addedTask);
     return res.json({
       success: true,
       newTask: addedTask
-    })
+    });
+  } catch (error) {
+    console.error('Ошибка добавления задачи:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера'
+    });
   }
-
-  console.error('Ошибка получения задач:', error);
-  res.status(500).json({
-    success: false,
-    message: 'Ошибка сервера'
-  });
-})
+});
 
 app.get('/api/users', async (req, res) => {
-  const users = await db.all('SELECT user_id, user_login FROM Users');
+  const result = await pool.query('SELECT user_id, user_login FROM Users');
   
   res.json({
     message: 'Список пользователей',
-    count: users.length,
-    users: users
+    count: result.rows.length,
+    users: result.rows
   });
 });
 
 app.get('/api/admin/download-db', async (req, res) => {
-  try {
-    const dbPath = path.join(__dirname, 'auth.db');
-    
-    res.download(dbPath, 'auth-backup.db', (err) => {
-      if (err) {
-        console.error('Ошибка скачивания:', err);
-      }
-    });
-    
-  } catch (error) {
-    console.error('Ошибка:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Ошибка сервера' 
-    });
-  }
+  res.status(501).json({ 
+    success: false, 
+    message: 'Функция скачивания БД недоступна для PostgreSQL' 
+  });
 });
 
 const PORT = process.env.PORT || 5000;
