@@ -1,4 +1,4 @@
-## Admin endpoints (pet project, not secure)
+##  API endpoints  
 Базовый URL:
 text
 https://todo-backend-api-ec5z.onrender.com
