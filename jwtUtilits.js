@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 export const hashPassword = async password => {
   const salt = await bcrypt.genSalt(10);
