@@ -215,7 +215,7 @@ app.get('/api/todo/:userId',authMiddleware, async (req, res) => {
     });
   }
 });
-  
+
 app.delete('/api/todo/delete/:taskId',authMiddleware, async (req, res) => {
   const { taskId } = req.params;
   const result = await pool.query(
@@ -275,7 +275,6 @@ app.post('/api/todo' ,authMiddleware, async (req, res) => {
     });
   }
 });
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

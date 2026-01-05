@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
 
 export const hashPassword = async password => {
   const salt = await bcrypt.genSalt(10);
@@ -30,7 +30,7 @@ export const authMiddleware = (req, res, next) => {
       });
   }
 
-  const token = authHeader.split('')[1];
+  const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.userId = decoded.userId;
