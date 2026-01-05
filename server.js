@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import pkg from 'pg';
 const { Pool } = pkg;
-import { hashPassword, comparePassword, generateToken, authMiddleware } from './jwtUtils.js';
+import { hashPassword, comparePassword, generateToken, authMiddleware } from './jwtUtilits.js'
 
 const app = express();
 app.use(cors()); 
@@ -194,7 +194,7 @@ app.post('/api/createUser', async (req, res) => {
   });
 });
 
-app.get('/api/todo/:userId', async (req, res) => {
+app.get('/api/todo/:userId',authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params; 
     const result = await pool.query(
@@ -216,7 +216,7 @@ app.get('/api/todo/:userId', async (req, res) => {
   }
 });
 
-app.delete('/api/todo/delete/:taskId', async (req, res) => {
+app.delete('/api/todo/delete/:taskId',authMiddleware, async (req, res) => {
   const { taskId } = req.params;
   const result = await pool.query(
     'DELETE FROM Tasks WHERE task_id = $1',
@@ -234,7 +234,7 @@ app.delete('/api/todo/delete/:taskId', async (req, res) => {
   });
 });
 
-app.post('/api/todo/edit', async (req, res) => {
+app.post('/api/todo/edit',authMiddleware, async (req, res) => {
   const { taskId, newTaskName } = req.body;
   const result = await pool.query(
     'UPDATE Tasks SET task_name = $1 WHERE task_id = $2',
@@ -252,7 +252,7 @@ app.post('/api/todo/edit', async (req, res) => {
   });
 });
 
-app.post('/api/todo', async (req, res) => {
+app.post('/api/todo' ,authMiddleware, async (req, res) => {
   const newTask = req.body;
 
   try {
