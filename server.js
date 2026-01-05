@@ -5,7 +5,11 @@ const { Pool } = pkg;
 import { hashPassword, comparePassword, generateToken, authMiddleware } from './jwtUtilits.js'
 
 const app = express();
-app.use(cors()); 
+app.use(cors({
+  origin: '*', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 const pool = new Pool({
@@ -224,11 +228,11 @@ app.delete('/api/todo/delete/:taskId',authMiddleware, async (req, res) => {
   );
   
   if (result.rowCount > 0) {
-    res.json({
+    return res.json({
       success: true,
     });
   }
-  res.status(500).json({
+  return res.status(500).json({
     success: false,
     message: 'Ошибка сервера'
   });
