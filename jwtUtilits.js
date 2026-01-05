@@ -1,19 +1,18 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
-const hashPassword = async password => {
+
+export const hashPassword = async password => {
   const salt = await bcrypt.genSalt(10);
   return await bcrypt.hash(password, salt);
 }
 
-const comparePassword = async (password, hashedPassword) => {
+export const comparePassword = async (password, hashedPassword) => {
   return await bcrypt.compare(password, hashedPassword);
 }
 
-const generateToken = userId => {
+export const generateToken = userId => {
   return jwt.sign(
     {userId},
     JWT_SECRET,
@@ -21,7 +20,7 @@ const generateToken = userId => {
   )
 }
 
-const authMiddleware = (req, res, next) => {
+export const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({

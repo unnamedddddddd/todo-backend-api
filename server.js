@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import pkg from 'pg';
 const { Pool } = pkg;
+import { hashPassword, comparePassword, generateToken, authMiddleware } from './jwtUtils.js';
 
 const app = express();
 app.use(cors()); 
@@ -11,39 +12,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
-
-const initializeDatabase = async () => {
-  try {
-    await pool.query('DROP TABLE IF EXISTS Tasks CASCADE');
-    await pool.query('DROP TABLE IF EXISTS Users CASCADE');
-    
-    await pool.query(`
-      CREATE TABLE Users (
-        user_id SERIAL PRIMARY KEY,
-        user_login VARCHAR(50) UNIQUE NOT NULL,
-        user_password VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    
-    await pool.query(`
-      CREATE TABLE Tasks (
-        task_id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES Users(user_id) ON DELETE CASCADE,
-        task_name TEXT NOT NULL,
-        done BOOLEAN DEFAULT false,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    
-    console.log('Таблицы созданы с правильной структурой');
-    
-  } catch (error) {
-    console.error('Ошибка создания таблиц:', error.message);
-  }
-}
-
-initializeDatabase();
 
 app.get('/api/debug/db', async (req, res) => {
   try {
@@ -126,26 +94,39 @@ app.post('/api/login', async (req, res) => {
   const { login, password } = req.body;
   
   const result = await pool.query(
-    'SELECT * FROM Users WHERE user_login = $1 AND user_password = $2',
-    [login, password]
+    'SELECT * FROM Users WHERE user_login = $1',
+    [login]
   );
-  
-  if (result.rows.length > 0) {
-    const user = result.rows[0];
-    console.table(user);
-    return res.json({
-      success: true,
-      message: 'Вход выполнен',
-      user: { 
-        id: user.user_id,
-        login: user.user_login 
-      }
+
+  if (result.rows.length === 0) {
+    return res.status(401).json({
+      success: false,
+      message: 'Неверный логин'
+    });
+  }
+
+  const user = result.rows[0];
+
+  const isPasswordValid = await comparePassword(password, user.user_password);
+
+  if (!isPasswordValid) {
+    return res.status(401).json({
+      success: false,
+      message: 'Неверный логин или пароль'
     });
   }
   
-  res.status(401).json({
-    success: false,
-    message: 'Неверный логин или пароль'
+  const token = generateToken(user.user_id);
+   
+  console.table(user);
+  res.json({
+    success: true,
+    message: 'Вход выполнен',
+    user: { 
+      id: user.user_id,
+      login: user.user_login 
+    },
+    token
   });
 });
 
@@ -158,12 +139,13 @@ app.post('/api/forgotPassword', async (req, res) => {
   );
   
   if (userResult.rows.length > 0) {
+    const hashedPassword = await hashPassword(newPassword);
     const result = await pool.query(
       'UPDATE Users SET user_password = $1 WHERE user_login = $2 RETURNING user_id',
-      [newPassword, login]
+      [hashedPassword, login]
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Пароль успешно обновлен',
       userLogin: login,
@@ -194,16 +176,21 @@ app.post('/api/createUser', async (req, res) => {
     });
   }
 
+  const hashedPassword = await hashPassword(password);
+
   const result = await pool.query(
     'INSERT INTO Users(user_login, user_password) VALUES ($1, $2) RETURNING user_id',
-    [login, password]
+    [login, hashedPassword]
   );
   
+  const token = generateToken(result.rows[0].user_id)
+
   res.status(201).json({
     success: true,
     message: 'Пользователь создан успешно',
     userLogin: login,
-    userId: result.rows[0].user_id
+    userId: result.rows[0].user_id,
+    token
   });
 });
 
@@ -215,7 +202,7 @@ app.get('/api/todo/:userId', async (req, res) => {
       [userId]
     );
         
-    return res.json({
+    res.json({
       success: true,
       tasks: result.rows
     });
@@ -237,7 +224,7 @@ app.delete('/api/todo/delete/:taskId', async (req, res) => {
   );
   
   if (result.rowCount > 0) {
-    return res.json({
+    res.json({
       success: true,
     });
   }
@@ -255,7 +242,7 @@ app.post('/api/todo/edit', async (req, res) => {
   );
   
   if (result.rowCount > 0) {
-    return res.json({
+    res.json({
       success: true,
     });
   }
@@ -276,7 +263,7 @@ app.post('/api/todo', async (req, res) => {
     
     const addedTask = result.rows[0];
     console.table(addedTask);
-    return res.json({
+    res.json({
       success: true,
       newTask: addedTask
     });
