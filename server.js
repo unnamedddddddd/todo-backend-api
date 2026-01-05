@@ -12,27 +12,38 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-pool.query(`
-  CREATE TABLE IF NOT EXISTS Users (
-    user_id SERIAL PRIMARY KEY,
-    user_login VARCHAR(50) UNIQUE NOT NULL,
-    user_password VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
-  
-  CREATE TABLE IF NOT EXISTS Tasks (
-    task_id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES Users(user_id) ON DELETE CASCADE,
-    task_name TEXT NOT NULL,
-    done BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
-`).then(() => {
-  console.log('Таблицы PostgreSQL готовы');
-}).catch(err => {
-  console.error('Ошибка таблиц:', err.message);
-});
+const initializeDatabase = async () => {
+  try {
+    await pool.query('DROP TABLE IF EXISTS Tasks CASCADE');
+    await pool.query('DROP TABLE IF EXISTS Users CASCADE');
+    
+    await pool.query(`
+      CREATE TABLE Users (
+        user_id SERIAL PRIMARY KEY,
+        user_login VARCHAR(50) UNIQUE NOT NULL,
+        user_password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    await pool.query(`
+      CREATE TABLE Tasks (
+        task_id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES Users(user_id) ON DELETE CASCADE,
+        task_name TEXT NOT NULL,
+        done BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    console.log('Таблицы созданы с правильной структурой');
+    
+  } catch (error) {
+    console.error('Ошибка создания таблиц:', error.message);
+  }
+}
 
+initializeDatabase();
 
 app.get('/api/debug/db', async (req, res) => {
   try {
@@ -74,8 +85,8 @@ app.get('/api/debug/db', async (req, res) => {
       };
       
       result.tables.push(tableInfo);
-      console.log(`   Колонки: ${columns.rows.map(c => c.column_name).join(', ')}`);
-      console.log(`   Записей: ${data.rows.length}`);
+      console.log(`Колонки: ${columns.rows.map(c => c.column_name).join(', ')}`);
+      console.log(`Записей: ${data.rows.length}`);
     }
     
     const totalUsers = await pool.query('SELECT COUNT(*) FROM Users');
@@ -100,8 +111,6 @@ app.get('/api/debug/db', async (req, res) => {
     });
   }
 });
-
-
 
 app.get('/api/health', async (req, res) => {
   const result = await pool.query('SELECT COUNT(*) as total FROM Users');
@@ -279,6 +288,7 @@ app.post('/api/todo', async (req, res) => {
     });
   }
 });
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
