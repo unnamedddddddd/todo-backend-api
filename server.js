@@ -17,6 +17,9 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+
+
+
 app.get('/api/debug/db', async (req, res) => {
   try {
     const tables = await pool.query(`
@@ -198,7 +201,7 @@ app.post('/api/createUser', async (req, res) => {
   });
 });
 
-app.get('/api/todo/:userId',authMiddleware, async (req, res) => {
+app.get('/api/todo/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params; 
     const result = await pool.query(
@@ -220,7 +223,7 @@ app.get('/api/todo/:userId',authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/todo/delete/:taskId',authMiddleware, async (req, res) => {
+app.delete('/api/todo/delete/:taskId', authMiddleware, async (req, res) => {
   const { taskId } = req.params;
   const result = await pool.query(
     'DELETE FROM Tasks WHERE task_id = $1',
@@ -238,7 +241,26 @@ app.delete('/api/todo/delete/:taskId',authMiddleware, async (req, res) => {
   });
 });
 
-app.post('/api/todo/edit',authMiddleware, async (req, res) => {
+app.post('/api/todo/done', authMiddleware, async (req, res) => {
+ const {taskId} = req.body;
+
+  const result = await pool.query(`UPDATE Tasks SET 
+    done = NOT done 
+    WHERE task_id = $2`, 
+  [taskId]);
+
+  if (result.rowCount > 0) {
+    return res.json({
+      success: true
+    })
+  }
+  return res.status(500).json({
+    success: false,
+    message: 'Ошибка сервера'
+  });
+})
+
+app.post('/api/todo/edit', authMiddleware, async (req, res) => {
   const { taskId, newTaskName } = req.body;
   const result = await pool.query(
     'UPDATE Tasks SET task_name = $1 WHERE task_id = $2',
@@ -246,17 +268,17 @@ app.post('/api/todo/edit',authMiddleware, async (req, res) => {
   );
   
   if (result.rowCount > 0) {
-    res.json({
+    return res.json({
       success: true,
     });
   }
-  res.status(500).json({
+  return res.status(500).json({
     success: false,
     message: 'Ошибка сервера'
   });
 });
 
-app.post('/api/todo' ,authMiddleware, async (req, res) => {
+app.post('/api/todo', authMiddleware, async (req, res) => {
   const newTask = req.body;
 
   try {
