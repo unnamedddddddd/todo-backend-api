@@ -246,7 +246,7 @@ app.post('/api/todo/done', authMiddleware, async (req, res) => {
 
   const result = await pool.query(`UPDATE Tasks SET 
     done = NOT done 
-    WHERE task_id = $2`, 
+    WHERE task_id = $1`, 
   [taskId]);
 
   if (result.rowCount > 0) {
