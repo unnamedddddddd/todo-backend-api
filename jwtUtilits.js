@@ -1,12 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_SECRET_REMEMBER = process.env.JWT_SECRET_REMEMBER;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
-const JWT_REMEMBER_TOKEN = process.env.JWT_REMEMBER_TOKEN;
-
-
 export const hashPassword = async password => {
   const salt = await bcrypt.genSalt(10);
   return await bcrypt.hash(password, salt);
@@ -19,16 +13,16 @@ export const comparePassword = async (password, hashedPassword) => {
   export const generateToken = userId => {
     return jwt.sign(
       {userId},
-      JWT_SECRET,
-      {expiresIn: JWT_EXPIRES_IN}
+      process.env.JWT_SECRET,
+      {expiresIn: process.env.JWT_EXPIRES_IN}
     )
   }
 
   export const generateTokenRemember = userId => {
     return jwt.sign(
       {userId},
-      JWT_SECRET_REMEMBER,
-      {expiresIn: JWT_REMEMBER_TOKEN}
+      process.env.JWT_SECRET,
+      {expiresIn: process.env.JWT_REMEMBER_TOKEN}
     )
   }
 
@@ -43,7 +37,7 @@ export const comparePassword = async (password, hashedPassword) => {
 
     const token = authHeader.split(' ')[1];
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.userId = decoded.userId;
       next();
     } catch (error) {
@@ -78,7 +72,7 @@ export const comparePassword = async (password, hashedPassword) => {
     }
     
     try {
-      const decoded = jwt.verify(token, JWT_SECRET_REMEMBER);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET_REMEMBER);
       req.userId = decoded.userId;
       next();
     } catch (error) {
