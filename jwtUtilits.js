@@ -21,7 +21,7 @@ export const generateToken = userId => {
 export const generateTokenRemember = userId => {
   return jwt.sign(
     {userId},
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET_REMEMBER,
     {expiresIn: process.env.JWT_REMEMBER_TOKEN}
   )
 }
@@ -84,5 +84,5 @@ export const rememberMiddleware  = (req, res, next) => {
       message: 'Неверный или истёкший refresh token' 
     });
   }
-}
+}   
 
