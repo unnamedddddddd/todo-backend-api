@@ -67,7 +67,7 @@ export const rememberMiddleware  = (req, res, next) => {
   if (!token) {
     return res.status(401).json({ 
       success: false, 
-      message: 'Требуется refresh token' 
+      message: `Требуется refresh token ${token}` 
     });
   }
   

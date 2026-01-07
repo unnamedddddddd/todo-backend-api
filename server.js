@@ -149,7 +149,6 @@ app.post('/api/login', async (req, res) => {
   console.table(user);
 });
 
-
 app.post('/api/tokenRemember', cors(), rememberMiddleware, async (req, res) => {  
   const userId = req.userId;
 
