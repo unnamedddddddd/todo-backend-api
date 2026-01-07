@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import pkg from 'pg';
 const { Pool } = pkg;
-import { hashPassword, comparePassword, generateToken, authMiddleware } from './jwtUtilits.js'
+import { hashPassword, comparePassword, generateToken, generateTokenRemember, authMiddleware, rememberMiddleware} from './jwtUtilits.js'
 
 const app = express();
 app.use(cors({
@@ -16,9 +16,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
-
-
-
 
 app.get('/api/debug/db', async (req, res) => {
   try {
@@ -98,7 +95,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const { login, password } = req.body;
+  const { login, password, rememberMe } = req.body;
   
   const result = await pool.query(
     'SELECT * FROM Users WHERE user_login = $1',
@@ -122,20 +119,62 @@ app.post('/api/login', async (req, res) => {
       message: 'Неверный логин или пароль'
     });
   }
-  
+
   const token = generateToken(user.user_id);
-   
+
+  if (rememberMe) {
+    const tokenRememberMe = generateTokenRemember(user.user_id);
+    return res.json({
+      success: true,
+      message: 'Вход выполнен',
+      user: { 
+        id: user.user_id,
+        login: user.user_login 
+      },
+      token,
+      tokenRememberMe
+    });
+  } else {
+    res.json({
+      success: true,
+      message: 'Вход выполнен',
+      user: { 
+        id: user.user_id,
+        login: user.user_login 
+      },
+      token 
+    });
+  }
+  
   console.table(user);
-  res.json({
-    success: true,
-    message: 'Вход выполнен',
-    user: { 
-      id: user.user_id,
-      login: user.user_login 
-    },
-    token
-  });
 });
+
+
+app.post('/api/tokenRemember', rememberMiddleware, async (req, res) => {  
+  const userId = req.userId;
+
+  const result = await pool.query(
+    'SELECT * FROM Users WHERE user_id = $1',
+    [userId]
+  );
+  if (result.rows.length > 0) {
+    const token = generateToken(result.rows[0].user_id);
+    return res.json({
+      success: true,
+      message: 'Вход выполнен',
+      user: { 
+        id: user.user_id,
+      },
+      token 
+    });
+  }
+  return res.status(409).json({
+    success: false,
+    error: 'Пользователь не найден',
+    message: 'Пользователь с таким логином не найден'
+  });
+})    
+
 
 app.post('/api/forgotPassword', async (req, res) => {
   const { login, newPassword } = req.body;
