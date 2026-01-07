@@ -150,7 +150,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 
-app.post('/api/tokenRemember', rememberMiddleware, async (req, res) => {  
+app.post('/api/tokenRemember', cors(), rememberMiddleware, async (req, res) => {  
   const userId = req.userId;
 
   const result = await pool.query(
@@ -163,7 +163,7 @@ app.post('/api/tokenRemember', rememberMiddleware, async (req, res) => {
       success: true,
       message: 'Вход выполнен',
       user: { 
-        id: user.user_id,
+        id: result.rows[0].user_id,
       },
       token 
     });

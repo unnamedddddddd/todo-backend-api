@@ -62,7 +62,7 @@ export const authMiddleware = (req, res, next) => {
 }
 
 export const rememberMiddleware  = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = req.body.refreshToken;
   
   if (!token) {
     return res.status(401).json({ 
