@@ -73,12 +73,15 @@ export const rememberMiddleware  = (req, res, next) => {
   
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET_REMEMBER);
+    console.log(decoded)
+    console.log(token)
+    console.log(process.env.JWT_SECRET_REMEMBER)
     req.userId = decoded.userId;
     next();
   } catch (error) {
     return res.status(401).json({ 
       success: false, 
-      message: `Неверный или истёкший refresh token ${decoded},${token} ,${process.env.JWT_SECRET_REMEMBER} , `
+      message: 'Неверный или истёкший refresh token' 
     });
   }
 }
