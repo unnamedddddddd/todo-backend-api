@@ -3,6 +3,7 @@ import cors from 'cors';
 import pkg from 'pg';
 const { Pool } = pkg;
 import { hashPassword, comparePassword, generateToken, generateTokenRemember, authMiddleware, rememberMiddleware} from './jwtUtilits.js'
+import { exchangeCodeForToken, getUserInfoFromGithub } from './github_auth.js';
 
 const app = express();
 app.use(cors({
@@ -149,6 +150,30 @@ app.post('/api/login', async (req, res) => {
   console.table(user);
 });
 
+app.post('/api/login/github', async (req, res) => {
+  try {
+  const { code } = req.body;
+
+  const tokenGitHub = await exchangeCodeForToken(code);
+  const userGitHub = await getUserInfoFromGithub(tokenGitHub.access_token);
+
+  console.table(userGitHub);
+
+  res.json({
+    success: true,
+    message: 'Вход выполнен',
+    user: { 
+      id: userGitHub.id,
+      login: userGitHub.login 
+    }
+  })
+
+  } catch (error) {
+    console.error('GitHub OAuth error:', error);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+})  
+
 app.post('/api/tokenRemember', cors(), rememberMiddleware, async (req, res) => {  
   const userId = req.userId;
 
@@ -206,7 +231,7 @@ app.post('/api/forgotPassword', async (req, res) => {
 });
 
 app.post('/api/createUser', async (req, res) => { 
-  const { login, password } = req.body;
+  const { auth_method, login, password,  } = req.body;
   
   const existingUser = await pool.query(
     'SELECT user_login FROM Users WHERE user_login = $1',
@@ -220,23 +245,49 @@ app.post('/api/createUser', async (req, res) => {
       message: 'Пользователь с таким логином уже существует'
     });
   }
+  try {
+    if (auth_method === 'local') {
+    const hashedPassword = await hashPassword(password);
 
-  const hashedPassword = await hashPassword(password);
+    const result = await pool.query(
+      'INSERT INTO Users(user_login, user_password) VALUES ($1, $2) RETURNING user_id',
+      [login, hashedPassword]
+    );
 
-  const result = await pool.query(
-    'INSERT INTO Users(user_login, user_password) VALUES ($1, $2) RETURNING user_id',
-    [login, hashedPassword]
-  );
-  
-  const token = generateToken(result.rows[0].user_id)
+    const token = generateToken(result.rows[0].user_id)
 
-  res.status(201).json({
-    success: true,
-    message: 'Пользователь создан успешно',
-    userLogin: login,
-    userId: result.rows[0].user_id,
-    token
-  });
+    res.status(201).json({
+      success: true,
+      message: 'Пользователь создан успешно',
+      userLogin: login,
+      userId: result.rows[0].user_id,
+      token
+    });
+  }
+  if (auth_method === 'github') {
+    const result = await pool.query(
+      'INSERT INTO Users(user_login, auth_method) VALUES ($1, $2) RETURNING user_id',
+      [login, auth_method]
+    );
+
+    const token = generateToken(result.rows[0].user_id)
+
+    res.status(201).json({
+      success: true,
+      message: 'Пользователь создан успешно',
+      userLogin: login,
+      userId: result.rows[0].user_id,
+      token
+    });
+  }
+  } catch (error) {
+    console.error(error);
+    return res.status(409).json({
+      success: false,
+      error: `${error}`,
+      message:'Ошибка сервера'
+    });
+  }
 });
 
 app.get('/api/todo/:userId', authMiddleware, async (req, res) => {
@@ -340,7 +391,7 @@ app.post('/api/todo', authMiddleware, async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
 });
