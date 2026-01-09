@@ -176,12 +176,14 @@ app.post('/api/login/github', async (req, res) => {
         token
       })
     } else {
+      console.log('else')
       const result = await pool.query(
         'INSERT INTO Users(user_login, auth_method) VALUES ($1, $2) RETURNING user_id',
         [userGitHub.login, 'github']
       );
       const token = generateToken(existingUser.rows[0].user_id);
-      return res.status(201).json({
+      console.log(token)
+      return res.json({
         success: true,
         message: 'Пользователь создан успешно',
         user: { 
