@@ -6,11 +6,13 @@ import { hashPassword, comparePassword, generateToken, generateTokenRemember, au
 import { exchangeCodeForToken, getUserInfoFromGithub } from './github_auth.js';
 
 const app = express();
+
 app.use(cors({
   origin: '*', 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 
 const pool = new Pool({
@@ -152,41 +154,43 @@ app.post('/api/login', async (req, res) => {
 
 app.post('/api/login/github', async (req, res) => {
   try {
-  const { code } = req.body;
+    const { code } = req.body;
 
-  const tokenGitHub = await exchangeCodeForToken(code);
-  const userGitHub = await getUserInfoFromGithub(tokenGitHub.access_token);
-  const token = generateToken(userGitHub.id);
+    const tokenGitHub = await exchangeCodeForToken(code);
+    const userGitHub = await getUserInfoFromGithub(tokenGitHub.access_token);
+    console.table(userGitHub);
 
-  console.table(userGitHub);
-
-  const existingUser = await pool.query(
-    'SELECT user_login FROM Users WHERE user_login = $1 AND auth_method = $2',
-    [userGitHub.login, 'github'] 
-  );
-  if (existingUser.rows.length > 0) {
-    return res.json({
-      success: true,
-      message: 'Вход выполнен',
-      isExists: true,
-      user: { 
-        id: existingUser.rows[0].id,       
-        login: existingUser.rows[0].user_login
-      },
-      token
-    })
-  }
-  return res.json({
-    success: true,
-    message: 'Вход выполнен',
-    isExists: false,
-    user: { 
-      id: userGitHub.id,        
-      login: userGitHub.login
-    },
-    token
-  })
-
+    const existingUser = await pool.query(
+      'SELECT user_id, user_login FROM Users WHERE user_login = $1 AND auth_method = $2',
+      [userGitHub.login, 'github'] 
+    );
+    if (existingUser.rows.length > 0) {
+      const token = generateToken(existingUser.rows[0].user_id);
+      return res.json({
+        success: true,
+        message: 'Вход выполнен',
+        user: { 
+          id: existingUser.rows[0].user_id,       
+          login: existingUser.rows[0].user_login
+        },
+        token
+      })
+    } else {
+      const result = await pool.query(
+        'INSERT INTO Users(user_login, auth_method) VALUES ($1, $2) RETURNING user_id',
+        [userGitHub.login, 'github']
+      );
+      const token = generateToken(existingUser.rows[0].user_id);
+      res.status(201).json({
+        success: true,
+        message: 'Пользователь создан успешно',
+        user: { 
+          id: result.rows[0].user_id,       
+          login: result.rows[0].user_login
+        },
+        token
+      })
+    }
   } catch (error) {
     console.error('GitHub OAuth error:', error);
     res.status(500).json({ error: 'Authentication failed' });
@@ -250,7 +254,7 @@ app.post('/api/forgotPassword', async (req, res) => {
 });
 
 app.post('/api/createUser', async (req, res) => { 
-  const { auth_method, login, password,  } = req.body;
+  const { login, password,  } = req.body;
   
   const existingUser = await pool.query(
     'SELECT user_login FROM Users WHERE user_login = $1',
@@ -265,34 +269,19 @@ app.post('/api/createUser', async (req, res) => {
     });
   }
   try {
-    if (auth_method === 'local') {
-      const hashedPassword = await hashPassword(password);
+    const hashedPassword = await hashPassword(password);
+    
+    const result = await pool.query(
+      'INSERT INTO Users(user_login, user_password) VALUES ($1, $2) RETURNING user_id',
+      [login, hashedPassword]
+    );
 
-      const result = await pool.query(
-        'INSERT INTO Users(user_login, user_password) VALUES ($1, $2) RETURNING user_id',
-        [login, hashedPassword]
-      );
-
-      res.status(201).json({
-        success: true,
-        message: 'Пользователь создан успешно',
-        userLogin: login,
-        userId: result.rows[0].user_id,
-      });
-    }
-    if (auth_method === 'github') {
-      const result = await pool.query(
-        'INSERT INTO Users(user_login, auth_method) VALUES ($1, $2) RETURNING user_id',
-        [login, auth_method]
-      );
-
-      res.status(201).json({
-        success: true,
-        message: 'Пользователь создан успешно',
-        userLogin: login,
-        userId: result.rows[0].user_id,
-      });
-    }
+    res.status(201).json({
+      success: true,
+      message: 'Пользователь создан успешно',
+      userLogin: login,
+      userId: result.rows[0].user_id,
+    });
   } catch (error) {
     console.error(error);
     return res.status(409).json({
