@@ -7,15 +7,15 @@ export const exchangeCodeForToken = async (code) => {
     },
     body: JSON.stringify({ 
       code,
-      ClIENT_ID_GITHUB: process.env.ClIENT_ID_GITHUB,
-      CLIENT_SECRET_GITHUB: process.env.CLIENT_SECRET_GITHUB,
+      client_id: process.env.ClIENT_ID_GITHUB,
+      client_secret: process.env.CLIENT_SECRET_GITHUB,
     })
   })
 
   const tokenGitHub = await response.json();
 
   if (tokenGitHub.error) {
-    throw new Error(`GitHub Auth error: ${tokenData.error_description} `);
+    throw new Error(`GitHub Auth error: ${tokenGitHub.error_description} `);
   }
   
   return tokenGitHub;
@@ -28,6 +28,11 @@ export const getUserInfoFromGithub = async (tokenGitHub) => {
       'Accept': 'application/json',
     },
   })
-
-  return response.json();
+  const userGitHub = await response.json();
+    
+  if (userGitHub.message) { 
+    throw new Error(`GitHub API error: ${userGitHub.message}`);
+  }
+  
+  return userGitHub;
 }
