@@ -181,8 +181,8 @@ app.post('/api/login/github', async (req, res) => {
         'INSERT INTO Users(user_login, auth_method) VALUES ($1, $2) RETURNING user_id',
         [userGitHub.login, 'github']
       );
-      console.log(`рез ${result}`)
-      const token = generateToken(existingUser.rows[0].user_id);
+      console.log('рез', result.rows[0] )
+      const token = generateToken(result.rows[0].user_id);
       console.log(token)
       return res.json({
         success: true,
@@ -194,7 +194,7 @@ app.post('/api/login/github', async (req, res) => {
         token
       })
     }
-  } catch (error) {
+  } catch (error) { 
     console.error('GitHub OAuth error:', error);
     res.status(500).json({ error: 'Authentication failed' });
   }
