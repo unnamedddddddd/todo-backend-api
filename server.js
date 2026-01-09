@@ -181,7 +181,7 @@ app.post('/api/login/github', async (req, res) => {
         [userGitHub.login, 'github']
       );
       const token = generateToken(existingUser.rows[0].user_id);
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         message: 'Пользователь создан успешно',
         user: { 
