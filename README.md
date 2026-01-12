@@ -1,34 +1,32 @@
 ##  API endpoints  
 Базовый URL:
-text
 https://todo-backend-api-ec5z.onrender.com
 Все доступные API маршруты:
 
-1. Проверка здоровья сервера:
-GET    /api/health
+Проверка здоровья сервера:
+GET /api/health
 
-  2. Авторизация:
-POST   /api/login
+Авторизация через GitHub:
+POST /api/login/github
 
-3. Регистрация:
-POST   /api/createUser
+Авторизация:
+POST /api/login
 
-4. Сброс пароля:
-POST   /api/forgotPassword
+Обновление токена через remember token:
+POST /api/tokenRemember
 
-5. Задачи (ToDo):
-Получить задачи пользователя:
-GET    /api/todo/:userId
+Регистрация:
+POST /api/createUser
 
-Добавить задачу:
-POST   /api/todo
+Сброс пароля:
+POST /api/forgotPassword
 
-Удалить задачу:
-DELETE /api/todo/delete/:taskId
+Задачи (ToDo):
+Получить задачи пользователя: GET /api/todo/:userId
+Добавить задачу: POST /api/todo
+Удалить задачу: DELETE /api/todo/delete/:taskId
+Отметить задачу как выполненную/невыполненную: POST /api/todo/done
+Редактировать задачу: POST /api/todo/edit
 
-Редактировать задачу:
-POST   /api/todo/edit
-
-6. Проверка БД (debug):
-
-GET    /api/debug/db
+Проверка БД (debug):
+GET /api/debug/db
