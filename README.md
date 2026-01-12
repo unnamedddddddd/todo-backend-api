@@ -21,11 +21,13 @@ POST /api/createUser
 Сброс пароля:
 POST /api/forgotPassword
 
-Задачи (ToDo):
+Задачи (ToDo): 
 Получить задачи пользователя: GET /api/todo/:userId
+
 Добавить задачу: POST /api/todo
+
 Удалить задачу: DELETE /api/todo/delete/:taskId
-Отметить задачу как выполненную/невыполненную: POST /api/todo/done
+
 Редактировать задачу: POST /api/todo/edit
 
 Проверка БД (debug):
